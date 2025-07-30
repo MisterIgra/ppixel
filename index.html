@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PixelBid - NFT Art Marketplace</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://unpkg.com/@tonconnect/sdk@latest/dist/tonconnect-sdk.min.js"></script>
+    <style>
+        /* Стили остаются прежними, добавлены только новые классы */
+        .role-badge {
+            padding: 3px 8px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            margin-left: 8px;
+        }
+        
+        .admin-badge {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .moderator-badge {
+            background: #4a6fa5;
+            color: white;
+        }
+        
+        .wallet-connected {
+            color: #28a745;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Главный экран -->
+        <div id="main-screen" class="screen active">
+            <header>
+                <div class="logo">🎨 PixelBid <span id="role-badge"></span></div>
+                <div id="user-balance">0.00 TON</div>
+            </header>
+            
+            <div class="nav-tabs">
+                <div class="nav-tab active" data-screen="editor">🎨 Создать</div>
+                <div class="nav-tab" data-screen="my-arts">🖼️ Мои арты</div>
+                <div class="nav-tab" data-screen="auctions">🏆 Аукционы</div>
+                <div class="nav-tab" data-screen="market">🛒 Магазин</div>
+                <div class="nav-tab" data-screen="profile">👤 Профиль</div>
+                <div class="nav-tab" data-screen="moderation" id="moderation-tab" style="display: none;">👮 Модерация</div>
+            </div>
+            
+            <div class="card">
+                <h2>Добро пожаловать, <span id="user-name">Гость</span>!</h2>
+                <p>Создавайте, продавайте и коллекционируйте уникальные пиксельные арты</p>
+                <button class="btn btn-primary" data-screen="editor">
+                    🎨 Начать создание
+                </button>
+            </div>
+            
+            <h3>Популярные лоты</h3>
+            <div class="grid" id="featured-auctions">
+                <!-- Популярные аукционы будут загружены динамически -->
+            </div>
+        </div>
+        
+        <!-- Экран редактора -->
+        <div id="editor-screen" class="screen">
+            <header>
+                <button class="btn btn-outline back-btn">← Назад</button>
+                <div class="logo">Редактор</div>
+                <button class="btn btn-primary" id="save-art-btn">💾 Сохранить</button>
+            </header>
+            
+            <div class="card">
+                <div class="editor-tools">
+                    <button class="tool-btn active" data-tool="pencil">Карандаш</button>
+                    <button class="tool-btn" data-tool="eraser">Ластик</button>
+                    <button class="tool-btn" data-tool="fill">Заливка</button>
+                </div>
+                
+                <div class="color-palette" id="color-palette">
+                    <!-- Цвета будут добавлены динамически -->
+                </div>
+                
+                <div class="editor-canvas-container">
+                    <div id="pixel-canvas"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Экран моих артов -->
+        <div id="my-arts-screen" class="screen">
+            <header>
+                <button class="btn btn-outline back-btn">← Назад</button>
+                <div class="logo">Мои арты</div>
+            </header>
+            
+            <div class="card">
+                <div id="arts-filter" class="nav-tabs">
+                    <div class="nav-tab active" data-status="all">Все</div>
+                    <div class="nav-tab" data-status="approved">Одобренные</div>
+                    <div class="nav-tab" data-status="pending">На модерации</div>
+                    <div class="nav-tab" data-status="rejected">Отклоненные</div>
+                </div>
+                
+                <div class="grid" id="user-arts-list">
+                    <!-- Арты пользователя будут загружены динамически -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Экран аукционов -->
+        <div id="auctions-screen" class="screen">
+            <header>
+                <button class="btn btn-outline back-btn">← Назад</button>
+                <div class="logo">Мои аукционы</div>
+                <button class="btn btn-primary" id="create-auction-btn">➕ Новый аукцион</button>
+            </header>
+            
+            <div class="card">
+                <div id="my-auctions-list">
+                    <!-- Список аукционов пользователя -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Экран магазина -->
+        <div id="market-screen" class="screen">
+            <header>
+                <button class="btn btn-outline back-btn">← Назад</button>
+                <div class="logo">Магазин</div>
+            </header>
+            
+            <div class="card">
+                <h3>Все аукционы</h3>
+                <div class="grid" id="all-auctions">
+                    <!-- Все аукционы будут загружены динамически -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Экран профиля -->
+        <div id="profile-screen" class="screen">
+            <header>
+                <button class="btn btn-outline back-btn">← Назад</button>
+                <div class="logo">Профиль</div>
+            </header>
+            
+            <div class="card">
+                <div class="form-group">
+                    <label>Имя пользователя</label>
+                    <input type="text" id="username" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label>ID Telegram</label>
+                    <input type="text" id="user-id" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label>Роль</label>
+                    <input type="text" id="user-role" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label>Баланс TON</label>
+                    <input type="text" id="user-balance-profile" readonly>
+                </div>
+                
+                <div class="form-group">
+                    <label>TON Кошелек</label>
+                    <div class="wallet-address" id="wallet-address">Не подключен</div>
+                    <button class="btn btn-primary" id="connect-wallet-btn">🔗 Подключить кошелек</button>
+                </div>
+                
+                <h3>Статистика</h3>
+                <div class="card">
+                    <p>🎨 Создано артов: <span id="art-count">0</span></p>
+                    <p>💰 Продано артов: <span id="sold-count">0</span></p>
+                    <p>🏆 Текущих аукционов: <span id="auctions-count">0</span></p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Экран модерации -->
+        <div id="moderation-screen" class="screen">
+            <header>
+                <button class="btn btn-outline back-btn">← Назад</button>
+                <div class="logo">Модерация</div>
+            </header>
+            
+            <div class="card">
+                <div class="nav-tabs">
+                    <div class="nav-tab active" data-tab="arts">Арты</div>
+                    <div class="nav-tab" data-tab="moderators">Модераторы</div>
+                </div>
+                
+                <div id="moderation-content">
+                    <!-- Контент будет загружен динамически -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- Модальное окно создания аукциона -->
+        <div class="modal" id="create-auction-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="modal-title">Создать аукцион</div>
+                    <div class="modal-close" id="close-auction-modal">×</div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Выберите арт</label>
+                    <select id="art-select">
+                        <!-- Арты будут добавлены динамически -->
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label>Название аукциона</label>
+                    <input type="text" id="auction-title" placeholder="Название вашего NFT">
+                </div>
+                
+                <div class="form-group">
+                    <label>Описание</label>
+                    <textarea id="auction-description" placeholder="Опишите ваш арт"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Стартовая цена (TON)</label>
+                    <input type="number" id="auction-start-price" min="0.1" step="0.1" value="0.5">
+                </div>
+                
+                <div class="form-group">
+                    <label>Длительность аукциона</label>
+                    <select id="auction-duration">
+                        <option value="1">1 день</option>
+                        <option value="3">3 дня</option>
+                        <option value="7" selected>7 дней</option>
+                    </select>
+                </div>
+                
+                <button class="btn btn-primary" id="create-auction-submit">Создать аукцион</button>
+            </div>
+        </div>
+        
+        <!-- Модальное окно аукциона -->
+        <div class="modal" id="auction-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <div class="modal-title" id="auction-modal-title">Аукцион</div>
+                    <div class="modal-close" id="close-auction-detail">×</div>
+                </div>
+                
+                <div id="auction-modal-content">
+                    <!-- Содержимое аукциона будет загружено динамически -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Основной объект приложения
+        const PixelBidApp = {
+            // Конфигурация
+            config: {
+                gridSize: 16,
+                pixelSize: 20,
+                colors: [
+                    '#000000', '#FF0000', '#00FF00', '#0000FF', 
+                    '#FFFF00', '#FF00FF', '#00FFFF', '#FFFFFF',
+                    '#FFA500', '#800080', '#008080', '#808000',
+                    '#800000', '#008000', '#000080', '#808080'
+                ],
+                adminId: 370552943 // Замените на ваш реальный ID
+            },
+            
+            // Состояние приложения
+            state: {
+                currentScreen: 'main',
+                user: null,
+                balance: 0,
+                wallet: null,
+                arts: [],
+                auctions: [],
+                selectedColor: '#000000',
+                currentTool: 'pencil',
+                isAdmin: false,
+                isModerator: false,
+                selectedArtForAuction: null,
+                moderators: [],
+                tonConnection: null
+            },
+            
+            // Инициализация приложения
+            init() {
+                // Инициализация Telegram WebApp
+                Telegram.WebApp.ready();
+                Telegram.WebApp.expand();
+                
+                // Загрузка данных из localStorage
+                this.loadLocalData();
+                
+                // Получение данных пользователя из Telegram
+                this.initUser();
+                
+                // Настройка навигации
+                this.setupNavigation();
+                
+                // Загрузка данных
+                this.loadUserData();
+                
+                // Инициализация редактора
+                this.initEditor();
+                
+                // Инициализация аукционов
+                this.initAuctions();
+                
+                // Инициализация кошелька
+                this.initWallet();
+                
+                // Инициализация TON кошелька
+                this.initTONConnection();
+            },
+            
+            // Загрузка данных из localStorage
+            loadLocalData() {
+                const savedArts = localStorage.getItem('arts');
+                if (savedArts) this.state.arts = JSON.parse(savedArts);
+                
+                const savedAuctions = localStorage.getItem('auctions');
+                if (savedAuctions) this.state.auctions = JSON.parse(savedAuctions);
+                
+                const savedModerators = localStorage.getItem('moderators');
+                if (savedModerators) {
+                    this.state.moderators = JSON.parse(savedModerators);
+                } else {
+                    // По умолчанию администратор
+                    this.state.moderators = [this.config.adminId];
+                    localStorage.setItem('moderators', JSON.stringify(this.state.moderators));
+                }
+            },
+            
+            // Инициализация пользователя
+            initUser() {
+                const initData = Telegram.WebApp.initDataUnsafe;
+                this.state.user = {
+                    id: initData.user?.id || Math.floor(Math.random() * 1000000),
+                    firstName: initData.user?.first_name || 'Гость',
+                    username: initData.user?.username || 'guest'
+                };
+                
+                // Проверка прав
+                this.state.isAdmin = this.state.user.id === this.config.adminId;
+                this.state.isModerator = this.state.moderators.includes(this.state.user.id) || this.state.isAdmin;
+                
+                // Обновление UI
+                document.getElementById('user-name').textContent = this.state.user.firstName;
+                document.getElementById('username').value = this.state.user.firstName;
+                document.getElementById('user-id').value = this.state.user.id;
+                
+                // Отображение роли
+                let roleBadge = '';
+                if (this.state.isAdmin) {
+                    roleBadge = '<span class="role-badge admin-badge">ADMIN</span>';
+                } else if (this.state.isModerator) {
+                    roleBadge = '<span class="role-badge moderator-badge">MOD</span>';
+                }
+                document.getElementById('role-badge').innerHTML = roleBadge;
+                
+                // Показать вкладку модерации для модераторов
+                if (this.state.isModerator) {
+                    document.getElementById('moderation-tab').style.display = 'flex';
+                }
+            },
+            
+            // Настройка навигации
+            setupNavigation() {
+                // Обработка кликов по табам
+                document.querySelectorAll('.nav-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        document.querySelectorAll('.nav-tab').forEach(t => {
+                            t.classList.remove('active');
+                        });
+                        tab.classList.add('active');
+                        this.showScreen(tab.dataset.screen);
+                    });
+                });
+                
+                // Кнопки "Назад"
+                document.querySelectorAll('.back-btn').forEach(btn => {
+                    btn.addEventListener('click', () => this.showScreen('main'));
+                });
+                
+                // Кнопки перехода
+                document.querySelectorAll('[data-screen]').forEach(btn => {
+                    if (btn.classList.contains('nav-tab')) return;
+                    btn.addEventListener('click', () => {
+                        this.showScreen(btn.dataset.screen);
+                    });
+                });
+                
+                // Кнопка создания аукциона
+                document.getElementById('create-auction-btn')?.addEventListener('click', () => {
+                    this.showCreateAuctionModal();
+                });
+                
+                // Кнопка сохранения арта
+                document.getElementById('save-art-btn')?.addEventListener('click', () => {
+                    this.saveArt();
+                });
+                
+                // Подключение кошелька
+                document.getElementById('connect-wallet-btn')?.addEventListener('click', () => {
+                    this.connectWallet();
+                });
+                
+                // Закрытие модальных окон
+                document.getElementById('close-auction-modal')?.addEventListener('click', () => {
+                    document.getElementById('create-auction-modal').classList.remove('active');
+                });
+                
+                document.getElementById('close-auction-detail')?.addEventListener('click', () => {
+                    document.getElementById('auction-modal').classList.remove('active');
+                });
+                
+                // Создание аукциона
+                document.getElementById('create-auction-submit')?.addEventListener('click', () => {
+                    this.createAuction();
+                });
+            },
+            
+            // Показать экран
+            showScreen(screenId) {
+                // Скрыть все экраны
+                document.querySelectorAll('.screen').forEach(screen => {
+                    screen.classList.remove('active');
+                });
+                
+                // Показать запрошенный экран
+                const screen = document.getElementById(`${screenId}-screen`);
+                if (screen) {
+                    screen.classList.add('active');
+                    this.state.currentScreen = screenId;
+                    
+                    // Загрузка данных при первом открытии
+                    if (screenId === 'editor' && !this.state.editorInitialized) {
+                        this.initEditorCanvas();
+                    }
+                    else if (screenId === 'my-arts') {
+                        this.loadUserArts();
+                    }
+                    else if (screenId === 'auctions') {
+                        this.loadUserAuctions();
+                    }
+                    else if (screenId === 'market') {
+                        this.loadAllAuctions();
+                    }
+                    else if (screenId === 'profile') {
+                        this.updateProfile();
+                    }
+                    else if (screenId === 'moderation') {
+                        this.renderModerationContent('arts');
+                    }
+                }
+            },
+            
+            // Загрузить данные пользователя
+            loadUserData() {
+                // Заглушка - в реальном приложении запрос к API
+                setTimeout(() => {
+                    this.state.balance = 5.25;
+                    document.getElementById('user-balance').textContent = `${this.state.balance} TON`;
+                    document.getElementById('user-balance-profile').value = `${this.state.balance} TON`;
+                    
+                    // Загрузка тестовых данных
+                    this.loadSampleArts();
+                    this.loadSampleAuctions();
+                    this.updateFeaturedAuctions();
+                }, 500);
+            },
+            
+            // Инициализация редактора
+            initEditor() {
+                this.state.editorInitialized = false;
+                this.initColorPalette();
+            },
+            
+            // Инициализация палитры цветов
+            initColorPalette() {
+                const palette = document.getElementById('color-palette');
+                palette.innerHTML = '';
+                
+                this.config.colors.forEach(color => {
+                    const colorElement = document.createElement('div');
+                    colorElement.className = 'color-option';
+                    if (color === this.state.selectedColor) {
+                        colorElement.classList.add('selected');
+                    }
+                    colorElement.style.backgroundColor = color;
+                    colorElement.dataset.color = color;
+                    colorElement.addEventListener('click', () => {
+                        this.selectColor(color);
+                    });
+                    palette.appendChild(colorElement);
+                });
+                
+                // Выбор инструментов
+                document.querySelectorAll('.tool-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.tool-btn').forEach(b => {
+                            b.classList.remove('active');
+                        });
+                        btn.classList.add('active');
+                        this.state.currentTool = btn.dataset.tool;
+                    });
+                });
+            },
+            
+            // Выбор цвета
+            selectColor(color) {
+                this.state.selectedColor = color;
+                
+                // Обновление UI
+                document.querySelectorAll('.color-option').forEach(option => {
+                    option.classList.toggle('selected', option.dataset.color === color);
+                });
+            },
+            
+            // Инициализация холста редактора
+            initEditorCanvas() {
+                const canvas = document.getElementById('pixel-canvas');
+                canvas.innerHTML = '';
+                canvas.style.gridTemplateColumns = `repeat(${this.config.gridSize}, ${this.config.pixelSize}px)`;
+                
+                // Создание пикселей
+                for (let i = 0; i < this.config.gridSize * this.config.gridSize; i++) {
+                    const pixel = document.createElement('div');
+                    pixel.className = 'pixel';
+                    pixel.dataset.index = i;
+                    
+                    pixel.addEventListener('click', () => {
+                        if (this.state.currentTool === 'pencil') {
+                            pixel.style.backgroundColor = this.state.selectedColor;
+                        } else if (this.state.currentTool === 'eraser') {
+                            pixel.style.backgroundColor = '';
+                        }
+                    });
+                    
+                    canvas.appendChild(pixel);
+                }
+                
+                this.state.editorInitialized = true;
+            },
+            
+            // Сохранение арта
+            saveArt() {
+                const artData = {
+                    id: Date.now(),
+                    title: `Мой арт #${Math.floor(Math.random() * 100)}`,
+                    pixels: [],
+                    created: new Date().toISOString(),
+                    authorId: this.state.user.id,
+                    authorName: this.state.user.firstName,
+                    status: 'pending' // На модерации
+                };
+                
+                // Сбор данных пикселей
+                document.querySelectorAll('.pixel').forEach(pixel => {
+                    artData.pixels.push(pixel.style.backgroundColor || '');
+                });
+                
+                // Добавление в коллекцию
+                this.state.arts.push(artData);
+                localStorage.setItem('arts', JSON.stringify(this.state.arts));
+                
+                // Уведомление
+                Telegram.WebApp.showAlert('Арт успешно сохранен и отправлен на модерацию!');
+                
+                // Возврат на главный экран
+                this.showScreen('main');
+            },
+            
+            // Инициализация аукционов
+            initAuctions() {
+                // Заглушка для тестирования
+                document.addEventListener('click', (e) => {
+                    if (e.target.closest('.art-card')) {
+                        const auctionId = e.target.closest('.art-card').dataset.id;
+                        this.showAuctionDetails(auctionId);
+                    }
+                });
+            },
+            
+            // Показать модальное окно создания аукциона
+            showCreateAuctionModal() {
+                const artSelect = document.getElementById('art-select');
+                artSelect.innerHTML = '';
+                
+                // Фильтрация утвержденных артов пользователя
+                const userArts = this.state.arts.filter(art => 
+                    art.authorId === this.state.user.id && 
+                    art.status === 'approved'
+                );
+                
+                if (userArts.length === 0) {
+                    artSelect.innerHTML = '<option value="">У вас нет одобренных артов</option>';
+                    return;
+                }
+                
+                userArts.forEach(art => {
+                    const option = document.createElement('option');
+                    option.value = art.id;
+                    option.textContent = art.title;
+                    artSelect.appendChild(option);
+                });
+                
+                document.getElementById('create-auction-modal').classList.add('active');
+            },
+            
+            // Создать новый аукцион
+            createAuction() {
+                const artId = parseInt(document.getElementById('art-select').value);
+                const title = document.getElementById('auction-title').value;
+                const description = document.getElementById('auction-description').value;
+                const startPrice = parseFloat(document.getElementById('auction-start-price').value);
+                const duration = parseInt(document.getElementById('auction-duration').value);
+                
+                if (!artId || !title || !startPrice) {
+                    Telegram.WebApp.showAlert('Заполните все обязательные поля');
+                    return;
+                }
+                
+                const art = this.state.arts.find(a => a.id === artId);
+                if (!art) return;
+                
+                const auction = {
+                    id: Date.now(),
+                    artId: art.id,
+                    title: title,
+                    description: description,
+                    startPrice: startPrice,
+                    currentPrice: startPrice,
+                    duration: duration,
+                    startDate: new Date().toISOString(),
+                    endDate: new Date(Date.now() + duration * 24 * 60 * 60 * 1000).toISOString(),
+                    authorId: this.state.user.id,
+                    bids: [],
+                    status: 'active'
+                };
+                
+                this.state.auctions.push(auction);
+                localStorage.setItem('auctions', JSON.stringify(this.state.auctions));
+                document.getElementById('create-auction-modal').classList.remove('active');
+                Telegram.WebApp.showAlert('Аукцион успешно создан!');
+                this.loadUserAuctions();
+            },
+            
+            // Загрузка пользовательских аукционов
+            loadUserAuctions() {
+                const container = document.getElementById('my-auctions-list');
+                container.innerHTML = '';
+                
+                const userAuctions = this.state.auctions.filter(
+                    auction => auction.authorId === this.state.user.id
+                );
+                
+                if (userAuctions.length === 0) {
+                    container.innerHTML = '<p>У вас пока нет активных аукционов</p>';
+                    return;
+                }
+                
+                userAuctions.forEach(auction => {
+                    const art = this.state.arts.find(a => a.id === auction.artId);
+                    if (!art) return;
+                    
+                    const auctionEl = document.createElement('div');
+                    auctionEl.className = 'card';
+                    auctionEl.innerHTML = `
+                        <h3>${auction.title}</h3>
+                        <p>Текущая цена: <strong>${auction.currentPrice} TON</strong></p>
+                        <p>Ставок: ${auction.bids.length}</p>
+                        <p>Окончание: ${new Date(auction.endDate).toLocaleDateString()}</p>
+                        <button class="btn btn-sm btn-primary" data-id="${auction.id}">Просмотреть</button>
+                    `;
+                    container.appendChild(auctionEl);
+                });
+                
+                // Добавляем обработчики кнопок
+                container.querySelectorAll('button').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const auctionId = parseInt(btn.dataset.id);
+                        this.showAuctionDetails(auctionId);
+                    });
+                });
+            },
+            
+            // Загрузка всех аукционов
+            loadAllAuctions() {
+                const container = document.getElementById('all-auctions');
+                container.innerHTML = '';
+                
+                this.state.auctions.forEach(auction => {
+                    const art = this.state.arts.find(a => a.id === auction.artId);
+                    if (!art) return;
+                    
+                    const auctionEl = document.createElement('div');
+                    auctionEl.className = 'art-card';
+                    auctionEl.dataset.id = auction.id;
+                    auctionEl.innerHTML = `
+                        <div class="art-preview" style="background-color: ${art.pixels[0] || '#ccc'};"></div>
+                        <div class="art-info">
+                            <div class="art-title">${auction.title}</div>
+                            <div class="art-price">${auction.currentPrice} TON</div>
+                            <div class="art-status">Осталось: ${this.getTimeLeft(auction.endDate)}</div>
+                        </div>
+                    `;
+                    container.appendChild(auctionEl);
+                });
+            },
+            
+            // Показать детали аукциона
+            showAuctionDetails(auctionId) {
+                const auction = this.state.auctions.find(a => a.id === auctionId);
+                if (!auction) return;
+                
+                const art = this.state.arts.find(a => a.id === auction.artId);
+                if (!art) return;
+                
+                const container = document.getElementById('auction-modal-content');
+                container.innerHTML = `
+                    <div class="card">
+                        <h3>${auction.title}</h3>
+                        <div class="art-preview" style="height: 200px; background-color: ${art.pixels[0] || '#ccc'};"></div>
+                        <p>${auction.description}</p>
+                        <p>Автор: ${art.authorName}</p>
+                    </div>
+                    
+                    <div class="card">
+                        <h4>Информация об аукционе</h4>
+                        <p>Текущая цена: <strong>${auction.currentPrice} TON</strong></p>
+                        <p>Стартовая цена: ${auction.startPrice} TON</p>
+                        <p>Ставок: ${auction.bids.length}</p>
+                        <p>Начало: ${new Date(auction.startDate).toLocaleDateString()}</p>
+                        <p>Окончание: ${new Date(auction.endDate).toLocaleDateString()} (${this.getTimeLeft(auction.endDate)})</p>
+                    </div>
+                    
+                    <div class="card">
+                        <h4>Сделать ставку</h4>
+                        <div class="form-group">
+                            <label>Ваша ставка (TON)</label>
+                            <input type="number" id="bid-amount" min="${auction.currentPrice + 0.1}" step="0.1" value="${auction.currentPrice + 0.1}">
+                        </div>
+                        <button class="btn btn-primary" id="place-bid-btn">Сделать ставку</button>
+                    </div>
+                `;
+                
+                document.getElementById('auction-modal').classList.add('active');
+                
+                // Обработка ставки
+                document.getElementById('place-bid-btn')?.addEventListener('click', () => {
+                    this.placeBid(auctionId);
+                });
+            },
+            
+            // Сделать ставку
+            placeBid(auctionId) {
+                const amount = parseFloat(document.getElementById('bid-amount').value);
+                const auction = this.state.auctions.find(a => a.id === auctionId);
+                
+                if (!auction) return;
+                if (amount <= auction.currentPrice) {
+                    Telegram.WebApp.showAlert('Ставка должна быть выше текущей!');
+                    return;
+                }
+                
+                auction.bids.push({
+                    userId: this.state.user.id,
+                    amount: amount,
+                    date: new Date().toISOString()
+                });
+                
+                auction.currentPrice = amount;
+                localStorage.setItem('auctions', JSON.stringify(this.state.auctions));
+                Telegram.WebApp.showAlert(`Ставка в ${amount} TON успешно сделана!`);
+                document.getElementById('auction-modal').classList.remove('active');
+            },
+            
+            // Инициализация кошелька
+            initWallet() {
+                // Проверяем, есть ли сохраненный кошелек
+                const savedWallet = localStorage.getItem('ton_wallet');
+                if (savedWallet) {
+                    this.state.wallet = JSON.parse(savedWallet);
+                    document.getElementById('wallet-address').textContent = this.state.wallet.address;
+                }
+            },
+            
+            // Инициализация TON кошелька
+            initTONConnection() {
+                this.state.tonConnection = new TonConnectSDK.TonConnect({
+                    manifestUrl: 'https://misterigra.github.io/pixelbid2/tonconnect-manifest.json'
+                });
+                
+                // Восстановление соединения
+                this.state.tonConnection.restoreConnection().then(wallet => {
+                    if (wallet) {
+                        this.state.wallet = {
+                            address: wallet.account.address,
+                            connected: true
+                        };
+                        document.getElementById('wallet-address').textContent = wallet.account.address;
+                    }
+                });
+            },
+            
+            // Подключение кошелька
+            connectWallet() {
+                const walletsList = this.state.tonConnection.getWallets();
+                const connector = this.state.tonConnection;
+                
+                connector.connect(walletsList[0]).then(wallet => {
+                    this.state.wallet = {
+                        address: wallet.account.address,
+                        connected: true
+                    };
+                    localStorage.setItem('ton_wallet', JSON.stringify(this.state.wallet));
+                    document.getElementById('wallet-address').textContent = wallet.account.address;
+                    Telegram.WebApp.showAlert('TON кошелек успешно подключен!');
+                }).catch(err => {
+                    console.error('Connection error:', err);
+                    Telegram.WebApp.showAlert('Ошибка подключения кошелька');
+                });
+            },
+            
+            // Загрузка артов пользователя
+            loadUserArts() {
+                const container = document.getElementById('user-arts-list');
+                container.innerHTML = '';
+                
+                const statusFilter = document.querySelector('#arts-filter .nav-tab.active').dataset.status;
+                
+                const userArts = this.state.arts.filter(art => 
+                    art.authorId === this.state.user.id &&
+                    (statusFilter === 'all' || art.status === statusFilter)
+                );
+                
+                if (userArts.length === 0) {
+                    container.innerHTML = '<p>Артов не найдено</p>';
+                    return;
+                }
+                
+                userArts.forEach(art => {
+                    const artEl = document.createElement('div');
+                    artEl.className = 'art-card';
+                    artEl.dataset.id = art.id;
+                    artEl.innerHTML = `
+                        <div class="art-preview" style="background-color: ${art.pixels[0] || '#ccc'};"></div>
+                        <div class="art-info">
+                            <div class="art-title">${art.title}</div>
+                            <div class="art-status">${this.getArtStatusText(art.status)}</div>
+                            ${art.status === 'approved' ? 
+                                `<button class="btn btn-sm btn-primary auction-art-btn" data-id="${art.id}">Аукцион</button>` : ''}
+                            <button class="btn btn-sm btn-outline delete-art-btn" data-id="${art.id}">Удалить</button>
+                        </div>
+                    `;
+                    container.appendChild(artEl);
+                });
+                
+                // Обработчики кнопок
+                container.querySelectorAll('.auction-art-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.createAuctionForArt(parseInt(btn.dataset.id));
+                    });
+                });
+                
+                container.querySelectorAll('.delete-art-btn').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        this.deleteArt(parseInt(btn.dataset.id));
+                    });
+                });
+                
+                // Фильтрация по статусу
+                document.querySelectorAll('#arts-filter .nav-tab').forEach(tab => {
+                    tab.addEventListener('click', () => {
+                        document.querySelectorAll('#arts-filter .nav-tab').forEach(t => {
+                            t.classList.remove('active');
+                        });
+                        tab.classList.add('active');
+                        this.loadUserArts();
+                    });
+                });
+            },
+            
+            // Вспомогательная функция для текста статуса
+            getArtStatusText(status) {
+                const statusMap = {
+                    'pending': '⏳ На модерации',
+                    'approved': '✅ Одобрено',
+                    'rejected': '❌ Отклонено'
+                };
+                return statusMap[status] || status;
+            },
+            
+            // Создание аукциона для арта
+            createAuctionForArt(artId) {
+                this.state.selectedArtForAuction = this.state.arts.find(a => a.id === artId);
+                document.getElementById('auction-title').value = this.state.selectedArtForAuction.title;
+                document.getElementById('create-auction-modal').classList.add('active');
+            },
+            
+            // Удаление арта
+            deleteArt(artId) {
+                this.state.arts = this.state.arts.filter(a => a.id !== artId);
+                localStorage.setItem('arts', JSON.stringify(this.state.arts));
+                Telegram.WebApp.showAlert('Арт успешно удален!');
+                this.loadUserArts();
+            },
+            
+            // Рендер контента модерации
+            renderModerationContent(tab) {
+                const container = document.getElementById('moderation-content');
+                container.innerHTML = '';
+                
+                if (tab === 'arts') {
+                    container.innerHTML = `
+                        <h3>Арты на модерации</h3>
+                        <div id="pending-arts-list"></div>
+                    `;
+                    this.loadPendingArts();
+                } 
+                else if (tab === 'moderators') {
+                    if (!this.state.isAdmin) {
+                        container.innerHTML = '<p>Только администратор может управлять модераторами</p>';
+                        return;
+                    }
+                    
+                    container.innerHTML = `
+                        <h3>Управление модераторами</h3>
+                        <div class="form-group">
+                            <label>Добавить модератора по ID Telegram</label>
+                            <input type="number" id="new-moderator-id" placeholder="Введите ID пользователя">
+                        </div>
+                        <button class="btn btn-primary" id="add-moderator-btn">Добавить</button>
+                        
+                        <h4>Текущие модераторы</h4>
+                        <ul id="moderators-list" class="card"></ul>
+                    `;
+                    this.loadModeratorsList();
+                }
+                
+                // Активируем правильную вкладку
+                document.querySelectorAll('#moderation-screen .nav-tab').forEach(tabElement => {
+                    tabElement.classList.toggle('active', tabElement.dataset.tab === tab);
+                });
+                
+                // Обработчики для вкладок
+                document.querySelectorAll('#moderation-screen .nav-tab').forEach(tabElement => {
+                    tabElement.addEventListener('click', () => {
+                        this.renderModerationContent(tabElement.dataset.tab);
+                    });
+                });
+                
+                // Обработчик для добавления модератора
+                document.getElementById('add-moderator-btn')?.addEventListener('click', () => {
+                    this.addModerator();
+                });
+            },
+            
+            // Загрузка артов на модерацию
+            loadPendingArts() {
+                const container = document.getElementById('pending-arts-list');
+                container.innerHTML = '';
+                
+                const pendingArts = this.state.arts.filter(art => art.status === 'pending');
+                
+                if (pendingArts.length === 0) {
+                    container.innerHTML = '<p>Нет артов на модерации</p>';
+                    return;
+                }
+                
+                pendingArts.forEach(art => {
+                    const artEl = document.createElement('div');
+                    artEl.className = 'card';
+                    artEl.innerHTML = `
+                        <h4>${art.title}</h4>
+                        <p>Автор: ${art.authorName}</p>
+                        <div class="art-preview" style="height: 100px; background-color: ${art.pixels[0] || '#ccc'};"></div>
+                        <div class="form-group">
+                            <label>Решение</label>
+                            <select class="art-status-select" data-id="${art.id}">
+                                <option value="pending">На рассмотрении</option>
+                                <option value="approved">Одобрить</option>
+                                <option value="rejected">Отклонить</option>
+                            </select>
+                        </div>
+                    `;
+                    container.appendChild(artEl);
+                    
+                    // Установка текущего статуса
+                    const select = artEl.querySelector('.art-status-select');
+                    select.value = art.status;
+                    
+                    // Обработчик изменения статуса
+                    select.addEventListener('change', () => {
+                        this.updateArtStatus(art.id, select.value);
+                    });
+                });
+            },
+            
+            // Обновление статуса арта
+            updateArtStatus(artId, status) {
+                const art = this.state.arts.find(a => a.id === artId);
+                if (art) {
+                    art.status = status;
+                    localStorage.setItem('arts', JSON.stringify(this.state.arts));
+                    
+                    // Обновляем интерфейс
+                    if (this.state.currentScreen === 'moderation') {
+                        this.loadPendingArts();
+                    }
+                    
+                    Telegram.WebApp.showAlert(`Статус арта "${art.title}" изменен на: ${status}`);
+                }
+            },
+            
+            // Загрузка списка модераторов
+            loadModeratorsList() {
+                const container = document.getElementById('moderators-list');
+                container.innerHTML = '';
+                
+                this.state.moderators.forEach(id => {
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <span>ID: ${id}</span>
+                        ${id !== this.config.adminId ? 
+                            `<button class="btn btn-sm btn-danger remove-moderator-btn" data-id="${id}">Удалить</button>` : 
+                            ''}
+                    `;
+                    container.appendChild(li);
+                });
+                
+                // Обработчики удаления модераторов
+                container.querySelectorAll('.remove-moderator-btn').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const id = parseInt(btn.dataset.id);
+                        this.removeModerator(id);
+                    });
+                });
+            },
+            
+            // Добавление модератора
+            addModerator() {
+                const newId = parseInt(document.getElementById('new-moderator-id').value);
+                if (!newId) return;
+                
+                if (this.state.moderators.includes(newId)) {
+                    Telegram.WebApp.showAlert('Этот пользователь уже является модератором');
+                    return;
+                }
+                
+                this.state.moderators.push(newId);
+                localStorage.setItem('moderators', JSON.stringify(this.state.moderators));
+                Telegram.WebApp.showAlert('Модератор успешно добавлен');
+                this.loadModeratorsList();
+            },
+            
+            // Удаление модератора
+            removeModerator(id) {
+                this.state.moderators = this.state.moderators.filter(modId => modId !== id);
+                localStorage.setItem('moderators', JSON.stringify(this.state.moderators));
+                Telegram.WebApp.showAlert('Модератор успешно удален');
+                this.loadModeratorsList();
+            },
+            
+            // Обновить профиль
+            updateProfile() {
+                document.getElementById('art-count').textContent = 
+                    this.state.arts.filter(a => a.authorId === this.state.user.id).length;
+                
+                document.getElementById('sold-count').textContent = 
+                    this.state.auctions.filter(a => 
+                        a.authorId === this.state.user.id && 
+                        a.status === 'completed'
+                    ).length;
+                
+                document.getElementById('auctions-count').textContent = 
+                    this.state.auctions.filter(a => 
+                        a.authorId === this.state.user.id && 
+                        a.status === 'active'
+                    ).length;
+                    
+                // Отображение роли
+                let role = 'Пользователь';
+                if (this.state.isModerator) role = 'Модератор';
+                if (this.state.isAdmin) role = 'Администратор';
+                document.getElementById('user-role').value = role;
+            },
+            
+            // Загрузка тестовых данных
+            loadSampleArts() {
+                // Если уже есть арты, не загружать тестовые
+                if (this.state.arts.length > 0) return;
+                
+                this.state.arts.push(
+                    {
+                        id: 1,
+                        title: "Космический кот",
+                        pixels: ["#000000", "#FF0000", "#0000FF"],
+                        created: "2025-07-25T12:00:00Z",
+                        authorId: this.state.user.id,
+                        authorName: this.state.user.firstName,
+                        status: "approved"
+                    },
+                    {
+                        id: 2,
+                        title: "Абстракция 42",
+                        pixels: ["#00FF00", "#FFFF00", "#FF00FF"],
+                        created: "2025-07-26T14:30:00Z",
+                        authorId: 12345,
+                        authorName: "Другой Художник",
+                        status: "approved"
+                    }
+                );
+            },
+            
+            loadSampleAuctions() {
+                if (this.state.auctions.length > 0) return;
+                
+                this.state.auctions.push(
+                    {
+                        id: 1,
+                        artId: 1,
+                        title: "Космический кот",
+                        description: "Пиксельный арт кота в космосе",
+                        startPrice: 0.5,
+                        currentPrice: 1.2,
+                        duration: 7,
+                        startDate: "2025-07-25T12:00:00Z",
+                        endDate: "2025-08-01T12:00:00Z",
+                        authorId: this.state.user.id,
+                        bids: [
+                            { userId: 12345, amount: 0.7, date: "2025-07-25T14:30:00Z" },
+                            { userId: 67890, amount: 1.2, date: "2025-07-26T09:15:00Z" }
+                        ],
+                        status: "active"
+                    }
+                );
+            },
+            
+            updateFeaturedAuctions() {
+                const container = document.getElementById('featured-auctions');
+                container.innerHTML = '';
+                
+                this.state.auctions.slice(0, 4).forEach(auction => {
+                    const art = this.state.arts.find(a => a.id === auction.artId);
+                    if (!art) return;
+                    
+                    const auctionEl = document.createElement('div');
+                    auctionEl.className = 'art-card';
+                    auctionEl.dataset.id = auction.id;
+                    auctionEl.innerHTML = `
+                        <div class="art-preview" style="background-color: ${art.pixels[0] || '#ccc'};"></div>
+                        <div class="art-info">
+                            <div class="art-title">${auction.title}</div>
+                            <div class="art-price">${auction.currentPrice} TON</div>
+                            <div class="art-status">Осталось: ${this.getTimeLeft(auction.endDate)}</div>
+                        </div>
+                    `;
+                    container.appendChild(auctionEl);
+                });
+            },
+            
+            // Вспомогательные функции
+            getTimeLeft(endDate) {
+                const end = new Date(endDate);
+                const now = new Date();
+                const diff = end - now;
+                
+                if (diff <= 0) return 'завершен';
+                
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                
+                return `${days}д ${hours}ч`;
+            }
+        };
+        
+        // Инициализация приложения при загрузке
+        document.addEventListener('DOMContentLoaded', () => PixelBidApp.init());
+    </script>
+</body>
+</html>
